@@ -4,6 +4,7 @@
 #import "RNSDefines.h"
 #import "RNSLog.h"
 #import "RNSTabBarController.h"
+#import "RNSTabsHostComponentView.h"
 #import "UIScrollView+RNScreens.h"
 
 @implementation RNSTabsScreenViewController {
@@ -41,18 +42,22 @@
 - (void)viewWillAppear:(BOOL)animated
 {
   [super viewWillAppear:animated];
+  _hasAppeared = NO;
   [self.tabScreenComponentView.reactEventEmitter emitOnWillAppear];
 }
 
 - (void)viewDidAppear:(BOOL)animated
 {
   [super viewDidAppear:animated];
+  _hasAppeared = YES;
   [self.tabScreenComponentView.reactEventEmitter emitOnDidAppear];
+  [[self findTabBarController].tabsHostComponentView tabScreenDidAppear];
 }
 
 - (void)viewWillDisappear:(BOOL)animated
 {
   [super viewWillDisappear:animated];
+  _hasAppeared = NO;
   [self.tabScreenComponentView.reactEventEmitter emitOnWillDisappear];
 }
 

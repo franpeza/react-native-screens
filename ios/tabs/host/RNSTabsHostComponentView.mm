@@ -38,6 +38,7 @@ namespace react = facebook::react;
 
 @implementation RNSTabsHostComponentView {
   RNSTabBarController *_Nonnull _controller;
+  BOOL _hasPendingAnimatedTabBarHiddenUpdate;
 
   RNSTabsHostEventEmitter *_Nonnull _reactEventEmitter;
 
@@ -259,7 +260,14 @@ namespace react = facebook::react;
     if (@available(iOS 18.0, *)) {
       // Do not animate during the first render / when it's detached from the UI.
       const BOOL shouldAnimate = [[_controller tabBar] window] != nil && _tabBarHiddenAnimationEnabled;
-      [_controller setTabBarHidden:_tabBarHidden animated:shouldAnimate];
+      if (shouldAnimate) {
+        // Animated once the transaction is mounted, after a tab selection requested from JS in
+        // the same update (see `animatePendingTabBarHiddenChangeIfPossible`).
+        _hasPendingAnimatedTabBarHiddenUpdate = YES;
+      } else {
+        _hasPendingAnimatedTabBarHiddenUpdate = NO;
+        [_controller setTabBarHidden:_tabBarHidden animated:NO];
+      }
     } else
 #endif // RNS_IPHONE_OS_VERSION_AVAILABLE(18_0)
     {
@@ -413,6 +421,63 @@ namespace react = facebook::react;
     [self updateContainer];
   }
   [_controller reactMountingTransactionDidMount];
+  [self animatePendingTabBarHiddenChangeIfPossible];
+}
+
+- (void)tabScreenDidAppear
+{
+  [self animatePendingTabBarHiddenChangeIfPossible];
+}
+
+/**
+ * Runs an animated `tabBarHidden` change once it no longer conflicts with a tab switch. Animating
+ * while UIKit presents a newly selected tab (e.g. selected from JS in the same update) makes the
+ * bar jump before it slides, so:
+ * - the selected tab has appeared: animate right away;
+ * - it is being presented: animate along with the tab bar controller's transition, or right away
+ *   when that transition is already animating;
+ * - no transition yet: wait for the tab to appear (`tabScreenDidAppear`).
+ */
+- (void)animatePendingTabBarHiddenChangeIfPossible
+{
+  if (!_hasPendingAnimatedTabBarHiddenUpdate) {
+    return;
+  }
+
+  auto *selectedController = static_cast<RNSTabsScreenViewController *>(_controller.selectedViewController);
+  const BOOL isSelectedTabAppearing =
+      [selectedController isKindOfClass:[RNSTabsScreenViewController class]] && !selectedController.hasAppeared;
+
+  if (isSelectedTabAppearing) {
+    // A tab switch is a transition of the tab bar controller itself, not of the tab screen.
+    id<UIViewControllerTransitionCoordinator> coordinator = _controller.transitionCoordinator;
+    if (coordinator == nil) {
+      return;
+    }
+    _hasPendingAnimatedTabBarHiddenUpdate = NO;
+    const BOOL hidden = _tabBarHidden;
+    const BOOL isAlongsideTransition = [coordinator
+        animateAlongsideTransition:^(id<UIViewControllerTransitionCoordinatorContext> _Nonnull context) {
+          [self setTabBarHiddenAnimated:hidden];
+        }
+                        completion:nil];
+    if (!isAlongsideTransition) {
+      [self setTabBarHiddenAnimated:hidden];
+    }
+    return;
+  }
+
+  _hasPendingAnimatedTabBarHiddenUpdate = NO;
+  [self setTabBarHiddenAnimated:_tabBarHidden];
+}
+
+- (void)setTabBarHiddenAnimated:(BOOL)hidden
+{
+#if RNS_IPHONE_OS_VERSION_AVAILABLE(18_0)
+  if (@available(iOS 18.0, *)) {
+    [_controller setTabBarHidden:hidden animated:YES];
+  }
+#endif // RNS_IPHONE_OS_VERSION_AVAILABLE(18_0)
 }
 
 #pragma mark - Common

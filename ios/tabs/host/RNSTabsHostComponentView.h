@@ -74,6 +74,12 @@ NS_ASSUME_NONNULL_BEGIN
  */
 - (nonnull RNSTabsHostEventEmitter *)reactEventEmitter;
 
+/**
+ * Called by the selected tab screen once it has appeared: runs a tab bar visibility change
+ * that waited for it.
+ */
+- (void)tabScreenDidAppear;
+
 @end
 
 #pragma mark - React Image Loader

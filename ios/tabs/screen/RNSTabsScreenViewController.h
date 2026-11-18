@@ -22,6 +22,11 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, weak, readonly, nullable) id<RNSTabsSpecialEffectsSupporting> tabsSpecialEffectsDelegate;
 
 /**
+ * Whether the tab screen has finished appearing (`viewDidAppear:`) and not started disappearing since.
+ */
+@property (nonatomic, readonly) BOOL hasAppeared;
+
+/**
  * Tell the controller that the tab screen it owns has got its react-props related to appearance changed.
  */
 - (void)tabItemAppearanceHasChanged;
